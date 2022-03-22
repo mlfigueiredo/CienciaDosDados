@@ -1,0 +1,157 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error as mse
+from sklearn.metrics import r2_score
+from math import sqrt
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import KFold
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GridSearchCV
+
+df_train= pd.read_excel('Data_Train.xlsx')
+df_train.head(5)
+
+df_train.columns
+df_train.info()
+df_train.describe(datetime_is_numeric=False, exclude=[object])
+df_train.isnull().sum()
+df_train.dropna(inplace=True)
+df_train[df_train.duplicated()].head()
+df_train.drop_duplicates(keep='first', inplace=True)
+df_train.shape
+df_train['Additional_Info'].value_counts()
+df_train['Additional_Info'].unique()
+df_train['Airline'].value_counts()
+df_train['Airline'].unique()
+df_train['Route'].unique()
+
+# Neste data set não tem target
+df_test= pd.read_excel('Test_set.xlsx')
+df_test.head(5)
+
+sns.catplot(y="Price", x= "Airline", data= df_train.sort_values("Price", ascending=False), kind="boxen", height=8, aspect=3)
+sns.catplot(y="Price", x= "Source", data= df_train.sort_values("Price", ascending=False), kind="boxen", height=8, aspect=3)
+sns.catplot(y="Price", x= "Destination", data= df_train.sort_values("Price", ascending=False), kind="boxen", height=8, aspect=3)
+
+df_train.Duration
+df_train['Duration']= df_train['Duration'].str.replace("h", '*60').str.replace(' ', '+').str.replace('m', '*1').apply(eval)
+df_train.Duration
+
+df_test['Duration']= df_test['Duration'].str.replace("h", '*60').str.replace(' ', '+').str.replace('m', '*1').apply(eval)
+df_test.Duration
+
+df_train.Date_of_Journey
+
+df_train['Journey_day']= df_train['Date_of_Journey'].str.split('/').str[0].astype(int)
+df_train['Journey_month']= df_train['Date_of_Journey'].str.split('/').str[1].astype(int)
+df_train['Journey_year']= df_train['Date_of_Journey'].str.split('/').str[2].astype(int)
+df_train.head(2)
+
+df_train['Dep_hour']= pd.to_datetime(df_train['Dep_Time']).dt.hour
+df_train['Dep_min']= pd.to_datetime(df_train['Dep_Time']).dt.minute
+df_train.drop(['Dep_Time'], axis=1, inplace=True)
+df_train.head(2)
+
+df_train['Arrival_hour']= pd.to_datetime(df_train['Arrival_Time']).dt.hour
+df_train['Arrival_min']= pd.to_datetime(df_train['Arrival_Time']).dt.minute
+df_train.drop(['Arrival_Time'], axis=1, inplace=True)
+
+df_test['Journey_day']= df_test['Date_of_Journey'].str.split('/').str[0].astype(int)
+df_test['Journey_month']= df_test['Date_of_Journey'].str.split('/').str[1].astype(int)
+df_test['Journey_year']= df_test['Date_of_Journey'].str.split('/').str[2].astype(int)
+
+df_test['Dep_hour']= pd.to_datetime(df_test['Dep_Time']).dt.hour
+df_test['Dep_min']= pd.to_datetime(df_test['Dep_Time']).dt.minute
+df_test.drop(['Dep_Time'], axis=1, inplace=True)
+
+df_test['Arrival_hour']= pd.to_datetime(df_test['Arrival_Time']).dt.hour
+df_test['Arrival_min']= pd.to_datetime(df_test['Arrival_Time']).dt.minute
+df_test.drop(['Arrival_Time'], axis=1, inplace=True)
+
+plt.figure(figsize=(10,5))
+ax=sns.countplot(x='Journey_month', data= df_train)
+
+plt.figure(figsize=(20,5))
+ax=sns.countplot(x='Airline', data= df_train)
+plt.xticks(rotation=45)
+
+plt.figure(figsize=(10,5))
+plt.scatter(df_train['Airline'], df_train['Price'])
+plt.xticks(rotation=75)
+
+plt.figure(figsize=(11,11))
+sns.heatmap(df_train.corr(), annot=True, cmap="RdYlGn")
+
+data= df_train.drop(['Price'], axis=1)
+
+train_categorical_data= data.select_dtypes(exclude=['int64', 'float', 'int32'])
+train_numerical_data= data.select_dtypes(include=['int64', 'float', 'int32'])
+
+test_categorical_data= data.select_dtypes(exclude=['int64', 'float', 'int32'])
+test_numerical_data= data.select_dtypes(include=['int64', 'float', 'int32'])
+
+train_categorical_data.head()
+
+train_numerical_data.head()
+
+le= LabelEncoder()
+train_categorical_data= train_categorical_data.apply(LabelEncoder().fit_transform)
+test_categorical_data= test_categorical_data.apply(LabelEncoder().fit_transform)
+
+x= pd.concat([train_categorical_data, train_numerical_data], axis=1)
+
+y= df_train['Price']
+
+test_set= pd.concat([test_categorical_data, test_numerical_data], axis=1)
+
+x.head()
+
+test_set.head()
+
+#Calculando Mean Absolute Percentage Error
+def mean_absolute_percentage_error(y_true, y_pred):
+  y_true, y_pred = np.array(y_true), np.array(y_pred)
+  return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+  
+x_train, x_test, y_train, y_test =  train_test_split(x, y, test_size= 0.3)
+
+print("O tamanho da entrada do treino: ", x_train.shape)
+print("O tamanho da saída do treino: ", y_train.shape)
+print("O tamanho da entrada do teste: ", x_test.shape)
+print("O tamanho da saída do teste: ", y_test.shape)
+
+depth = list(range(1, 11))
+
+param_grid = dict(max_depth= depth)
+
+param_grid
+
+tree = GridSearchCV(DecisionTreeRegressor(), param_grid, cv = 10)
+tree.fit(x_train, y_train)
+
+y_train_pred= tree.predict(x_train)
+y_test_pred= tree.predict(x_test)
+
+y_train_pred
+
+tree.best_params_
+
+#Avalia dados de treino
+print(sqrt(mse(y_train.values, y_train_pred)))
+print(round(mean_absolute_percentage_error(y_train.values, y_train_pred), 2))
+print( r2_score(y_train.values, y_train_pred))  #Tivemos 90% de acerto para os dados de treino
+
+#Avalia dados de teste
+print(sqrt(mse(y_test.values, y_test_pred)))
+print(round(mean_absolute_percentage_error(y_test.values, y_test_pred), 2))
+print( r2_score(y_test.values, y_test_pred))  #Tivemos 78% de acerto para os dados de teste. A minha máquina tem uma assertividade de 78%, 
+                                              #ou seja não tivemos overfit, se o valor fosse muito baixo aí teria overfit
+                                              
+                                              
+  
+  
